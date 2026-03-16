@@ -22,3 +22,7 @@ with st.sidebar:
 results_df = calculate_topic_importance(exam_questions, collection, model)
 os.remove("temp_lecture.pdf")
 os.remove("temp_exam.pdf")
+if not results_df.empty:
+        st.success("Analysis Complete!")
+        st.subheader("📋 Detailed Topic Breakdown")
+        st.dataframe(results_df[["Topic Snippet", "Relevance Score"]], use_container_width=True)

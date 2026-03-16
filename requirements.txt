@@ -1,0 +1,6 @@
+PyPDF2==3.0.1
+sentence-transformers==2.5.1
+chromadb==0.4.24
+pandas==2.2.1
+streamlit==1.32.0
+plotly==5.20.0

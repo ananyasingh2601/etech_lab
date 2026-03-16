@@ -2,6 +2,7 @@ from extraction import extract_exam_questions
 from processing import process_lecture
 from database import load_model, init_db, store_lecture
 from scoring import calculate_topic_importance
+from visualization import create_bar_chart, create_pie_chart
 import streamlit as st
 import os
 
@@ -24,5 +25,8 @@ os.remove("temp_lecture.pdf")
 os.remove("temp_exam.pdf")
 if not results_df.empty:
         st.success("Analysis Complete!")
+        col1, col2 = st.columns(2)
+        with col1: st.plotly_chart(create_bar_chart(results_df), use_container_width=True)
+        with col2: st.plotly_chart(create_pie_chart(results_df), use_container_width=True)
         st.subheader("📋 Detailed Topic Breakdown")
         st.dataframe(results_df[["Topic Snippet", "Relevance Score"]], use_container_width=True)

@@ -1,6 +1,7 @@
 from extraction import extract_exam_questions
 from processing import process_lecture
 from database import load_model, init_db, store_lecture
+from scoring import calculate_topic_importance
 import streamlit as st
 import os
 
@@ -18,3 +19,6 @@ with st.sidebar:
         model, collection = load_model(), init_db()
         store_lecture(process_lecture("temp_lecture.pdf"), lecture_file.name, collection, model)
         exam_questions = extract_exam_questions("temp_exam.pdf")
+results_df = calculate_topic_importance(exam_questions, collection, model)
+os.remove("temp_lecture.pdf")
+os.remove("temp_exam.pdf")

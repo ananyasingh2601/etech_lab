@@ -2,9 +2,10 @@ from sentence_transformers import SentenceTransformer
 import chromadb
 import os
 
+
 def load_model():
     """Loads the Sentence-BERT model."""
-    return SentenceTransformer('all-MiniLM-L6-v2')
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def init_db(db_path="./chroma_db", collection_name="lectures"):

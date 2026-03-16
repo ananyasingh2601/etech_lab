@@ -33,6 +33,7 @@ def store_lecture(chunks, filename, collection, model):
 
 def query_database(query_text, collection, model, n_results=3):
     """Searches the database for lecture topics similar to the query."""
+    # Embed the user query and search for the most similar lecture chunks.
     query_embedding = model.encode([query_text]).tolist()
     results = collection.query(
         query_embeddings=query_embedding,

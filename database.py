@@ -15,19 +15,23 @@ def init_db(db_path="./chroma_db", collection_name="lectures"):
     return collection
 
 
-def store_lecture(chunks, filename, collection, model):
-    """Embeds lecture chunks and saves them to the database."""
-    if not chunks:
-        return
+def store_lecture(chunks_data, filename, collection, model):
+    """Embeds chunks and saves them along with file and page metadata."""
+    if not chunks_data: return
+    
+    # Extract just the text strings for the AI model
+    chunks = [item["chunk"] for item in chunks_data]
     embeddings = model.encode(chunks).tolist()
-    ids = [f"{filename}_chunk_{i}" for i in range(len(chunks))]
-    metadatas = [{"source": filename} for _ in chunks]
-
+    
+    # Create unique IDs and save the page/source info
+    ids = [f"{filename}_p{item['page']}_{i}" for i, item in enumerate(chunks_data)]
+    metadatas = [{"source": filename, "page": item["page"]} for item in chunks_data]
+    
     collection.add(
-        embeddings=embeddings,
-        documents=chunks,
-        metadatas=metadatas,
-        ids=ids,
+        embeddings=embeddings, 
+        documents=chunks, 
+        metadatas=metadatas, 
+        ids=ids
     )
 
 

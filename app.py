@@ -7,42 +7,39 @@ from database import load_model, init_db, store_lecture
 from scoring import calculate_topic_importance
 from visualization import create_bar_chart, create_pie_chart
 
-# UI Setup
 st.set_page_config(page_title="Lecture-to-Exam Mapper", layout="wide")
 st.title("Lecture-to-Exam Topic Mapping System")
 
 with st.sidebar:
     st.header("Upload Documents")
-    lecture_file = st.file_uploader("Upload Lecture Notes (PDF)", type="pdf")
+    # NEW: accept_multiple_files is now True!
+    lecture_files = st.file_uploader("Upload Lecture Notes (PDF)", type="pdf", accept_multiple_files=True)
     exam_file = st.file_uploader("Upload Previous Exam (PDF)", type="pdf")
     process_btn = st.button("Analyze & Map Topics")
 
-# Everything below must only happen IF the button is clicked and files are present
 if process_btn:
-    if lecture_file and exam_file:
+    if lecture_files and exam_file:
         with st.spinner("Processing documents and running AI... This may take a moment."):
-            # 1. Save files temporarily
-            with open("temp_lecture.pdf", "wb") as f: f.write(lecture_file.getbuffer())
-            with open("temp_exam.pdf", "wb") as f: f.write(exam_file.getbuffer())
-            
-            # 2. Load AI and DB
             model = load_model()
             collection = init_db()
             
-            # 3. Process Lecture
-            store_lecture(process_lecture("temp_lecture.pdf"), lecture_file.name, collection, model)
+            # NEW: Loop through every uploaded lecture file
+            for lf in lecture_files:
+                temp_filename = f"temp_{lf.name}"
+                with open(temp_filename, "wb") as f: 
+                    f.write(lf.getbuffer())
+                
+                # Process and store this specific lecture
+                store_lecture(process_lecture(temp_filename), lf.name, collection, model)
+                os.remove(temp_filename)
             
-            # 4. Process Exam
+            # Process Exam
+            with open("temp_exam.pdf", "wb") as f: f.write(exam_file.getbuffer())
             exam_questions = extract_exam_questions("temp_exam.pdf")
-            
-            # 5. Calculate Scores
-            results_df = calculate_topic_importance(exam_questions, collection, model)
-            
-            # Clean up files
-            os.remove("temp_lecture.pdf")
             os.remove("temp_exam.pdf")
             
-        # 6. Display Results
+            results_df = calculate_topic_importance(exam_questions, collection, model)
+            
         if not results_df.empty:
             st.success("Analysis Complete!")
             
@@ -51,7 +48,8 @@ if process_btn:
             with col2: st.plotly_chart(create_pie_chart(results_df), use_container_width=True)
 
             st.subheader("Detailed Topic Breakdown")
-            st.dataframe(results_df[["Topic Snippet", "Relevance Score"]], use_container_width=True)
+            # The dataframe will now show the File and Page columns automatically!
+            st.dataframe(results_df[["Topic Snippet", "Relevance", "File", "Page"]], use_container_width=True)
             
     else:
-        st.warning("Please upload both a lecture PDF and an exam PDF before analyzing.")
+        st.warning("Please upload at least one lecture PDF and an exam PDF.")

@@ -42,5 +42,6 @@ def query_database(query_text, collection, model, n_results=3):
     results = collection.query(
         query_embeddings=query_embedding,
         n_results=n_results,
+        include=['embeddings', 'metadatas', 'documents', 'distances']
     )
     return results

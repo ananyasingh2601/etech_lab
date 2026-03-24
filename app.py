@@ -46,6 +46,132 @@ st.markdown("""
     .step-title { font-size: 18px; font-weight: bold; color: white; margin-bottom: 10px; }
     .step-description { font-size: 14px; color: #b0b0b0; }
     .step-arrow { font-size: 30px; color: #0D47A1; align-self: center; }
+
+    .topic-preview-wrap {
+        margin: 20px 0 30px;
+        background: #252525;
+        border-radius: 18px;
+        padding: 26px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+    .topic-preview-tabs {
+        display: flex;
+        justify-content: center;
+        gap: 38px;
+        margin-bottom: 20px;
+        font-size: 19px;
+        font-weight: 600;
+    }
+    .topic-preview-tabs .active {
+        color: #ffffff;
+        border-bottom: 3px solid #0D47A1;
+        padding-bottom: 8px;
+    }
+    .topic-preview-tabs .muted {
+        color: #7f7f7f;
+        padding-bottom: 8px;
+    }
+    .topic-preview-card {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #1f1f1f;
+        border-radius: 24px;
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 34px 34px 30px;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+        position: relative;
+        z-index: 2;
+    }
+    .preview-title {
+        color: #ffffff;
+        font-size: 46px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+    .preview-row {
+        margin: 22px 0;
+    }
+    .preview-row-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 8px;
+    }
+    .preview-topic {
+        font-size: 36px;
+        color: #f0f0f0;
+        font-weight: 500;
+    }
+    .preview-pct {
+        font-size: 48px;
+        color: #ffffff;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+    }
+    .preview-track {
+        height: 9px;
+        background: #343434;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+    .preview-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #0E8BFF 0%, #0D47A1 100%);
+        border-radius: 999px;
+    }
+    .preview-note {
+        margin-top: 22px;
+        color: #a5a5a5;
+        font-size: 24px;
+    }
+
+    .doodle {
+        position: absolute;
+        pointer-events: none;
+        opacity: 0.95;
+        z-index: 1;
+    }
+    .doodle-circle {
+        width: 130px;
+        height: 130px;
+        border: 3px dashed rgba(13, 71, 161, 0.55);
+        border-radius: 50%;
+        right: -20px;
+        top: 16px;
+    }
+    .doodle-wave {
+        width: 180px;
+        height: 60px;
+        left: 14px;
+        bottom: 14px;
+        background:
+            radial-gradient(circle at 10% 60%, rgba(14,139,255,0.55) 0 7px, transparent 8px),
+            radial-gradient(circle at 30% 35%, rgba(14,139,255,0.55) 0 7px, transparent 8px),
+            radial-gradient(circle at 50% 62%, rgba(14,139,255,0.55) 0 7px, transparent 8px),
+            radial-gradient(circle at 70% 36%, rgba(14,139,255,0.55) 0 7px, transparent 8px),
+            radial-gradient(circle at 90% 60%, rgba(14,139,255,0.55) 0 7px, transparent 8px);
+    }
+    .doodle-scribble {
+        width: 120px;
+        height: 120px;
+        right: 24px;
+        bottom: 18px;
+        border-right: 4px solid rgba(14, 139, 255, 0.45);
+        border-top: 4px solid rgba(14, 139, 255, 0.45);
+        border-radius: 18px 56px 12px 80px;
+        transform: rotate(12deg);
+    }
+
+    @media (max-width: 900px) {
+        .topic-preview-tabs { gap: 18px; font-size: 15px; }
+        .topic-preview-card { padding: 22px 18px; }
+        .preview-title { font-size: 30px; }
+        .preview-topic { font-size: 24px; }
+        .preview-pct { font-size: 32px; }
+        .preview-note { font-size: 18px; }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -70,6 +196,50 @@ st.markdown("""
         <div class="step-icon">📊</div>
         <div class="step-title">Get Topic Insights</div>
         <div class="step-description">See exactly what to focus on for maximum impact</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="topic-preview-wrap">
+    <div class="doodle doodle-circle"></div>
+    <div class="doodle doodle-wave"></div>
+    <div class="doodle doodle-scribble"></div>
+
+    <div class="topic-preview-tabs">
+        <div class="active">Overview</div>
+        <div class="muted">Topic Breakdown</div>
+        <div class="muted">Trends</div>
+    </div>
+
+    <div class="topic-preview-card">
+        <div class="preview-title">Operating Systems</div>
+
+        <div class="preview-row">
+            <div class="preview-row-head">
+                <div class="preview-topic">Memory Management</div>
+                <div class="preview-pct">32%</div>
+            </div>
+            <div class="preview-track"><div class="preview-fill" style="width: 32%;"></div></div>
+        </div>
+
+        <div class="preview-row">
+            <div class="preview-row-head">
+                <div class="preview-topic">Process Scheduling</div>
+                <div class="preview-pct">21%</div>
+            </div>
+            <div class="preview-track"><div class="preview-fill" style="width: 21%;"></div></div>
+        </div>
+
+        <div class="preview-row">
+            <div class="preview-row-head">
+                <div class="preview-topic">File Systems</div>
+                <div class="preview-pct">18%</div>
+            </div>
+            <div class="preview-track"><div class="preview-fill" style="width: 18%;"></div></div>
+        </div>
+
+        <div class="preview-note">Based on analysis of 87 exam papers (2019-2024)</div>
     </div>
 </div>
 """, unsafe_allow_html=True)

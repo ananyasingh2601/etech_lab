@@ -26,35 +26,97 @@ from visualization import (
 st.set_page_config(
     page_title="Lecture-to-Exam Mapper", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Custom CSS for better styling
 st.markdown("""
     <style>
-    .main { background: #1a1a1a; color: #ffffff; }
-    [data-testid="stAppViewContainer"] { background: #1a1a1a; }
-    [data-testid="stSidebar"] { background: #2d2d2d; }
-    .stMetric { background: #2d2d2d; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border-left: 4px solid #0D47A1; color: white; }
-    .stButton > button { border-radius: 8px; font-weight: bold; padding: 10px 30px; background: #0D47A1; color: white; }
+    :root {
+        --bg-base: #f4f7fb;
+        --bg-panel: #ffffff;
+        --ink-main: #10263f;
+        --ink-soft: #5f7288;
+        --accent: #0f766e;
+        --accent-strong: #0b5f58;
+        --accent-alt: #f59e0b;
+        --line: #d8e1ec;
+    }
+    .main { background: var(--bg-base); color: var(--ink-main); }
+    [data-testid="stAppViewContainer"] {
+        background: radial-gradient(circle at 8% 0%, #e8f6f4 0%, var(--bg-base) 42%), var(--bg-base);
+    }
+    [data-testid="stSidebar"] { display: none; }
+    .stMetric {
+        background: var(--bg-panel);
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(16, 38, 63, 0.08);
+        border-left: 4px solid var(--accent);
+        color: var(--ink-main);
+    }
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 700;
+        padding: 10px 18px;
+        background: linear-gradient(120deg, var(--accent) 0%, var(--accent-strong) 100%);
+        color: white;
+        border: none;
+    }
     .stTabs [data-baseweb="tab-list"] button { border-radius: 8px 8px 0 0; }
-    .header-title { font-size: 2.5em; color: #ffffff; font-weight: bold; text-align: center; margin-bottom: 20px; }
-    .info-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin: 10px 0; }
-    .how-it-works-container { display: flex; justify-content: space-around; align-items: center; margin: 40px 0; padding: 30px; background: #2d2d2d; border-radius: 15px; }
+    .header-title { font-size: 2.5em; color: var(--ink-main); font-weight: 800; text-align: center; margin-bottom: 20px; }
+    .info-box {
+        background: linear-gradient(130deg, #e6f7f5 0%, #f0f9ff 100%);
+        color: var(--ink-main);
+        padding: 18px;
+        border-radius: 12px;
+        margin: 10px 0;
+        border: 1px solid #cce8e4;
+    }
+    .how-it-works-container { display: flex; justify-content: space-around; align-items: center; margin: 30px 0; padding: 26px; background: var(--bg-panel); border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 10px 22px rgba(16, 38, 63, 0.08); }
     .step-card { text-align: center; flex: 1; padding: 20px; }
-    .step-icon { font-size: 50px; margin-bottom: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); width: 80px; height: 80px; border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: white; }
-    .step-title { font-size: 18px; font-weight: bold; color: white; margin-bottom: 10px; }
-    .step-description { font-size: 14px; color: #b0b0b0; }
-    .step-arrow { font-size: 30px; color: #0D47A1; align-self: center; }
+    .step-icon { font-size: 42px; margin-bottom: 15px; background: linear-gradient(135deg, #0f766e 0%, #0e7490 100%); width: 76px; height: 76px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: white; }
+    .step-title { font-size: 18px; font-weight: 700; color: var(--ink-main); margin-bottom: 10px; }
+    .step-description { font-size: 14px; color: var(--ink-soft); }
+    .step-arrow { font-size: 30px; color: var(--accent); align-self: center; }
+
+    .control-panel {
+        margin: 20px 0 26px;
+        background: var(--bg-panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 12px 24px rgba(16, 38, 63, 0.08);
+    }
+    .panel-title {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: var(--ink-main);
+        margin-bottom: 4px;
+    }
+    .panel-subtitle {
+        color: var(--ink-soft);
+        margin-bottom: 16px;
+    }
+    .hint-badge {
+        background: #fff7e6;
+        color: #7a4a00;
+        border: 1px solid #ffe1ad;
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-top: 10px;
+        font-size: 0.9rem;
+    }
 
     .topic-preview-wrap {
         margin: 20px 0 30px;
-        background: #252525;
+        background: var(--bg-panel);
         border-radius: 18px;
         padding: 26px;
         position: relative;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.08);
+        border: 1px solid var(--line);
+        box-shadow: 0 10px 20px rgba(16, 38, 63, 0.08);
     }
     .topic-preview-tabs {
         display: flex;
@@ -65,27 +127,27 @@ st.markdown("""
         font-weight: 600;
     }
     .topic-preview-tabs .active {
-        color: #ffffff;
-        border-bottom: 3px solid #0D47A1;
+        color: var(--ink-main);
+        border-bottom: 3px solid var(--accent);
         padding-bottom: 8px;
     }
     .topic-preview-tabs .muted {
-        color: #7f7f7f;
+        color: #88a;
         padding-bottom: 8px;
     }
     .topic-preview-card {
         max-width: 900px;
         margin: 0 auto;
-        background: #1f1f1f;
+        background: #fbfdff;
         border-radius: 24px;
-        border: 1px solid rgba(255,255,255,0.08);
+        border: 1px solid #dde7f2;
         padding: 34px 34px 30px;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
         position: relative;
         z-index: 2;
     }
     .preview-title {
-        color: #ffffff;
+        color: var(--ink-main);
         font-size: 46px;
         font-weight: 700;
         margin-bottom: 18px;
@@ -101,29 +163,29 @@ st.markdown("""
     }
     .preview-topic {
         font-size: 36px;
-        color: #f0f0f0;
+        color: var(--ink-main);
         font-weight: 500;
     }
     .preview-pct {
         font-size: 48px;
-        color: #ffffff;
+        color: var(--ink-main);
         font-weight: 600;
         letter-spacing: -0.5px;
     }
     .preview-track {
         height: 9px;
-        background: #343434;
+        background: #d7e3ef;
         border-radius: 999px;
         overflow: hidden;
     }
     .preview-fill {
         height: 100%;
-        background: linear-gradient(90deg, #0E8BFF 0%, #0D47A1 100%);
+        background: linear-gradient(90deg, #0ea5a0 0%, #0e7490 100%);
         border-radius: 999px;
     }
     .preview-note {
         margin-top: 22px;
-        color: #a5a5a5;
+        color: var(--ink-soft);
         font-size: 24px;
     }
 
@@ -136,7 +198,7 @@ st.markdown("""
     .doodle-circle {
         width: 130px;
         height: 130px;
-        border: 3px dashed rgba(13, 71, 161, 0.55);
+        border: 3px dashed rgba(15, 118, 110, 0.4);
         border-radius: 50%;
         right: -20px;
         top: 16px;
@@ -158,8 +220,8 @@ st.markdown("""
         height: 120px;
         right: 24px;
         bottom: 18px;
-        border-right: 4px solid rgba(14, 139, 255, 0.45);
-        border-top: 4px solid rgba(14, 139, 255, 0.45);
+        border-right: 4px solid rgba(14, 116, 144, 0.4);
+        border-top: 4px solid rgba(14, 116, 144, 0.4);
         border-radius: 18px 56px 12px 80px;
         transform: rotate(12deg);
     }
@@ -246,27 +308,31 @@ st.markdown("""
 
 st.markdown("---")
 
-with st.sidebar:
-    st.markdown("### 📂 Upload Your Documents")
-    st.markdown("---")
-    
+st.markdown("""
+<div class="control-panel">
+    <div class="panel-title">Control Center</div>
+    <div class="panel-subtitle">Upload your files, tune confidence, and run analysis from one place.</div>
+</div>
+""", unsafe_allow_html=True)
+
+input_col, settings_col = st.columns([2, 1])
+
+with input_col:
     lecture_files = st.file_uploader(
-        "📚 Upload Lecture Notes (PDF)", 
-        type="pdf", 
+        "📚 Upload Lecture Notes (PDF)",
+        type="pdf",
         accept_multiple_files=True,
         help="Upload one or more lecture PDFs to analyze"
     )
-    
+
     exam_file = st.file_uploader(
-        "📝 Upload Previous Exam (PDF)", 
+        "📝 Upload Previous Exam (PDF)",
         type="pdf",
         help="Upload exam PDF to identify which lecture topics appear"
     )
-    
-    st.markdown("---")
+
+with settings_col:
     st.markdown("### ⚙️ Analysis Settings")
-    
-    # Confidence Threshold Slider with visual feedback
     confidence_threshold = st.slider(
         "Confidence Threshold",
         min_value=0.0,
@@ -275,37 +341,27 @@ with st.sidebar:
         step=0.05,
         help="Only show matches with similarity above this threshold. Higher = stricter matching."
     )
-    
-    # Visual threshold indicator
+
     threshold_color = "🟢" if confidence_threshold < 0.4 else "🟡" if confidence_threshold < 0.7 else "🔴"
     st.metric("Current Threshold", f"{threshold_color} {confidence_threshold:.2f}")
-    
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**Threshold Guide:**")
-        st.caption("🟢 Low (0.0-0.4): More results")
-        st.caption("🟡 Medium (0.4-0.7): Balanced")
-        st.caption("🔴 High (0.7-1.0): Strict")
-    
-    st.markdown("---")
-    
-    # Main analysis button with icon
+    st.caption("🟢 Low: More results")
+    st.caption("🟡 Medium: Balanced")
+    st.caption("🔴 High: Strict matching")
+
     process_btn = st.button(
-        "🚀 Analyze & Map Topics", 
+        "🚀 Analyze & Map Topics",
         use_container_width=True,
         type="primary"
     )
-    
-    # Info box
-    st.markdown("""
-    <div class="info-box">
-    <b>💡 How it works:</b><br>
-    Uploads your lectures → AI learns topic meanings → 
-    Finds which lecture topics match exam questions → 
-    Ranks by importance for exam preparation
-    </div>
-    """, unsafe_allow_html=True)
+
+st.markdown("""
+<div class="info-box">
+<b>💡 How it works:</b><br>
+Upload lecture files, map exam questions to the most relevant topics, and get a ranked study plan with trend insights.
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="hint-badge">Tip: Use 0.30-0.50 confidence for first pass, then increase threshold to focus on high-certainty topics.</div>', unsafe_allow_html=True)
 
 if process_btn:
     if lecture_files and exam_file:

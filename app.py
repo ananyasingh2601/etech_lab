@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import pandas as pd
 import numpy as np
+import re
 
 from extraction import extract_exam_questions
 from processing import process_lecture
@@ -22,6 +23,145 @@ from visualization import (
     create_file_contribution_bar,
     create_topic_card
 )
+
+
+STOP_WORDS = {
+    "the", "and", "for", "with", "from", "into", "that", "this", "your", "their", "are",
+    "was", "were", "have", "has", "had", "will", "would", "could", "should", "about", "which",
+    "when", "where", "what", "why", "how", "all", "any", "can", "each", "more", "less", "than",
+    "using", "used", "use", "based", "over", "under", "between", "topic", "topics", "system", "data"
+}
+
+
+def _normalize_topic(topic_text):
+    cleaned = re.sub(r"\s+", " ", str(topic_text or "")).strip()
+    return cleaned[:120]
+
+
+def _topic_keywords(topic_text, max_keywords=3):
+    words = re.findall(r"[A-Za-z]{4,}", str(topic_text or "").lower())
+    filtered = [w for w in words if w not in STOP_WORDS]
+    if not filtered:
+        return ["concept", "application"]
+
+    # Keep order but remove duplicates.
+    seen = set()
+    unique = []
+    for token in filtered:
+        if token not in seen:
+            seen.add(token)
+            unique.append(token)
+    return unique[:max_keywords]
+
+
+def build_topic_intelligence(results_df):
+    if results_df.empty:
+        return {}
+
+    avg_similarity = float(results_df["Similarity"].mean())
+    high_count = int((results_df["Similarity"] >= 0.7).sum())
+    medium_count = int(((results_df["Similarity"] >= 0.45) & (results_df["Similarity"] < 0.7)).sum())
+    low_count = int((results_df["Similarity"] < 0.45).sum())
+
+    top_row = results_df.iloc[0]
+    top_topic = _normalize_topic(top_row["Lecture Topic"])
+    top_file = top_row["File"]
+
+    recommendations = []
+    for idx, row in results_df.head(8).iterrows():
+        sim = float(row["Similarity"])
+        if sim >= 0.75:
+            action = "Master first"
+        elif sim >= 0.55:
+            action = "Revise with PYQs"
+        else:
+            action = "Quick revision"
+
+        recommendations.append({
+            "Rank": idx + 1,
+            "Topic": _normalize_topic(row["Lecture Topic"]),
+            "Similarity": round(sim, 3),
+            "Action": action
+        })
+
+    return {
+        "avg_similarity": round(avg_similarity, 3),
+        "high_count": high_count,
+        "medium_count": medium_count,
+        "low_count": low_count,
+        "top_topic": top_topic,
+        "top_file": top_file,
+        "recommendations": pd.DataFrame(recommendations)
+    }
+
+
+def generate_question_paper(results_df, exam_questions, paper_type="mid"):
+    top_topics = [_normalize_topic(t) for t in results_df["Lecture Topic"].head(10).tolist()]
+    question_bank = [q.strip() for q in exam_questions if q and len(q.strip()) > 15]
+
+    if paper_type == "mid":
+        title = "MID TERM EXAMINATION"
+        duration = "1.5 Hours"
+        max_marks = 30
+        short_count = 6
+        long_count = 3
+    else:
+        title = "END TERM EXAMINATION"
+        duration = "3 Hours"
+        max_marks = 70
+        short_count = 8
+        long_count = 6
+
+    lines = [
+        title,
+        "Course: Topic Intelligence Based Paper",
+        f"Duration: {duration}",
+        f"Maximum Marks: {max_marks}",
+        "",
+        "Instructions:",
+        "1. Read all questions carefully.",
+        "2. Attempt questions in clear steps with relevant examples.",
+        "3. Draw neat diagrams wherever applicable.",
+        "",
+        "SECTION A - Short Answer Questions"
+    ]
+
+    for i in range(short_count):
+        topic = top_topics[i % max(1, len(top_topics))] if top_topics else "Core Topic"
+        keywords = _topic_keywords(topic)
+        q = f"Q{i + 1}. Explain the role of {keywords[0]} in {topic.lower()}. Give one practical example."
+        lines.append(q)
+
+    lines.append("")
+    lines.append("SECTION B - Long Answer Questions")
+
+    for i in range(long_count):
+        topic = top_topics[(i + short_count) % max(1, len(top_topics))] if top_topics else "Core Topic"
+        keywords = _topic_keywords(topic)
+        matched = ""
+
+        if question_bank:
+            for candidate in question_bank:
+                c_lower = candidate.lower()
+                if any(k in c_lower for k in keywords):
+                    matched = candidate
+                    break
+
+        if matched:
+            q_text = f"Q{short_count + i + 1}. {matched}"
+        else:
+            q_text = (
+                f"Q{short_count + i + 1}. Analyze {topic.lower()} with reference to {keywords[0]} and {keywords[-1]}. "
+                "Provide a structured answer with use-case discussion."
+            )
+        lines.append(q_text)
+
+    lines.append("")
+    lines.append("Suggested Focus Topics:")
+    for idx, topic in enumerate(top_topics[:6], start=1):
+        lines.append(f"{idx}. {topic}")
+
+    return "\n".join(lines)
 
 st.set_page_config(
     page_title="Lecture-to-Exam Mapper", 
@@ -114,6 +254,13 @@ st.markdown("""
     .panel-subtitle {
         color: var(--ink-soft);
         margin-bottom: 16px;
+    }
+    .section-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+        box-shadow: 0 6px 16px rgba(16, 38, 63, 0.06);
     }
     .hint-badge {
         background: #fff7e6;
@@ -402,6 +549,72 @@ if process_btn:
                 st.metric("❓ Exam Questions", len(exam_questions))
             with metric_cols[4]:
                 st.metric("📚 Lectures Analyzed", len(lecture_files))
+
+            st.markdown("---")
+            st.markdown("### 🧠 Topic Intelligence")
+            topic_info = build_topic_intelligence(results_df)
+            info_col1, info_col2, info_col3 = st.columns(3)
+            with info_col1:
+                st.metric("Top Priority Topic", topic_info["top_topic"][:32] + ("..." if len(topic_info["top_topic"]) > 32 else ""))
+            with info_col2:
+                st.metric("Avg Confidence", topic_info["avg_similarity"])
+            with info_col3:
+                st.metric("High Priority Topics", topic_info["high_count"])
+
+            mix_col1, mix_col2 = st.columns([1.2, 1.8])
+            with mix_col1:
+                st.markdown('<div class="section-card"><b>Coverage Mix</b><br><br>'
+                            f'High: {topic_info["high_count"]}<br>'
+                            f'Medium: {topic_info["medium_count"]}<br>'
+                            f'Low: {topic_info["low_count"]}<br><br>'
+                            f'Strongest source file: {topic_info["top_file"]}'
+                            '</div>', unsafe_allow_html=True)
+            with mix_col2:
+                st.markdown("#### Recommended Study Order")
+                st.dataframe(topic_info["recommendations"], use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+            st.markdown("### 📝 Generate Question Paper")
+            gen_col1, gen_col2, gen_col3 = st.columns([1.2, 1.2, 1])
+            with gen_col1:
+                paper_mode = st.radio(
+                    "Select Paper Type",
+                    ["Mid Term Paper", "End Term Paper"],
+                    horizontal=False
+                )
+            with gen_col2:
+                st.markdown('<div class="section-card"><b>Paper Blueprint</b><br><br>'
+                            'Mid Term: 1.5 hrs, short + long mix<br>'
+                            'End Term: 3 hrs, deeper analytical set<br><br>'
+                            'Questions are generated from your identified important topics and extracted exam patterns.'
+                            '</div>', unsafe_allow_html=True)
+            with gen_col3:
+                generate_btn = st.button(
+                    "Generate Mid Term Paper" if paper_mode == "Mid Term Paper" else "Generate End Term Paper",
+                    use_container_width=True,
+                    type="primary"
+                )
+
+            if generate_btn:
+                paper_type = "mid" if paper_mode == "Mid Term Paper" else "end"
+                generated_paper = generate_question_paper(results_df, exam_questions, paper_type=paper_type)
+                st.session_state["generated_paper_text"] = generated_paper
+                st.session_state["generated_paper_name"] = "mid_term_paper.txt" if paper_type == "mid" else "end_term_paper.txt"
+
+            if "generated_paper_text" in st.session_state:
+                st.markdown("#### Generated Paper Preview")
+                st.text_area(
+                    "Preview",
+                    st.session_state["generated_paper_text"],
+                    height=360,
+                    label_visibility="collapsed"
+                )
+                st.download_button(
+                    label="📥 Download Generated Paper",
+                    data=st.session_state["generated_paper_text"],
+                    file_name=st.session_state.get("generated_paper_name", "question_paper.txt"),
+                    mime="text/plain"
+                )
             
             st.markdown("---")
             

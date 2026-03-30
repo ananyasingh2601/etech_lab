@@ -221,6 +221,25 @@ def generate_paper_pdf_bytes(paper_text, paper_meta):
     if not PDF_EXPORT_AVAILABLE:
         return None
 
+    def _normalize_pdf_lines(text, max_token_len=80):
+        normalized = []
+        for raw_line in text.splitlines():
+            line = raw_line.encode("latin-1", "ignore").decode("latin-1")
+            if not line.strip():
+                normalized.append("")
+                continue
+
+            tokens = line.split(" ")
+            safe_tokens = []
+            for token in tokens:
+                if len(token) <= max_token_len:
+                    safe_tokens.append(token)
+                else:
+                    for i in range(0, len(token), max_token_len):
+                        safe_tokens.append(token[i:i + max_token_len] + ("-" if i + max_token_len < len(token) else ""))
+            normalized.append(" ".join(safe_tokens))
+        return normalized
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -233,12 +252,16 @@ def generate_paper_pdf_bytes(paper_text, paper_meta):
     pdf.cell(0, 8, f"Average Similarity: {paper_meta.get('avg_similarity', '-')}", ln=True)
     pdf.ln(2)
 
-    for line in paper_text.splitlines():
-        safe_line = line.encode("latin-1", "ignore").decode("latin-1")
+    for safe_line in _normalize_pdf_lines(paper_text):
         if not safe_line.strip():
             pdf.ln(3)
         else:
-            pdf.multi_cell(0, 7, safe_line)
+            # Keep cursor pinned to left margin so width=0 remains valid on every line.
+            try:
+                pdf.multi_cell(0, 7, safe_line, new_x="LMARGIN", new_y="NEXT")
+            except TypeError:
+                pdf.set_x(pdf.l_margin)
+                pdf.multi_cell(0, 7, safe_line)
 
     raw = pdf.output(dest="S")
     if isinstance(raw, bytes):
@@ -606,8 +629,14 @@ Upload lecture files, map exam questions to the most relevant topics, and get a 
 
 st.markdown('<div class="hint-badge">Tip: Use 0.30-0.50 confidence for first pass, then increase threshold to focus on high-certainty topics.</div>', unsafe_allow_html=True)
 
-if process_btn:
-    if lecture_files and exam_file:
+if process_btn or st.session_state.get("analysis_ready", False):
+    results_df = pd.DataFrame()
+    exam_questions = []
+    fallback_used = False
+    lecture_count = 0
+    active_threshold = confidence_threshold
+
+    if process_btn and lecture_files and exam_file:
         with st.spinner("⏳ Processing documents and running AI... This may take a moment."):
             model = load_model()
             collection = init_db()
@@ -643,7 +672,32 @@ if process_btn:
                 if not retry_df.empty:
                     results_df = retry_df
                     fallback_used = True
-        
+            lecture_count = len(lecture_files)
+
+            if not results_df.empty:
+                st.session_state["analysis_results_df"] = results_df
+                st.session_state["analysis_exam_questions"] = exam_questions
+                st.session_state["analysis_fallback_used"] = fallback_used
+                st.session_state["analysis_lecture_count"] = lecture_count
+                st.session_state["analysis_threshold"] = confidence_threshold
+                st.session_state["analysis_ready"] = True
+            else:
+                st.session_state.pop("analysis_results_df", None)
+                st.session_state.pop("analysis_exam_questions", None)
+                st.session_state.pop("analysis_fallback_used", None)
+                st.session_state.pop("analysis_lecture_count", None)
+                st.session_state.pop("analysis_threshold", None)
+                st.session_state["analysis_ready"] = False
+    elif process_btn:
+        st.warning("⚠️ Please upload at least one lecture PDF and an exam PDF to begin analysis.")
+        st.session_state["analysis_ready"] = False
+
+    if st.session_state.get("analysis_ready", False):
+        results_df = st.session_state.get("analysis_results_df", pd.DataFrame())
+        exam_questions = st.session_state.get("analysis_exam_questions", [])
+        fallback_used = st.session_state.get("analysis_fallback_used", False)
+        lecture_count = st.session_state.get("analysis_lecture_count", 0)
+        active_threshold = st.session_state.get("analysis_threshold", confidence_threshold)
         if not results_df.empty:
             st.success("✅ Analysis Complete!")
             if fallback_used:
@@ -664,7 +718,7 @@ if process_btn:
             with metric_cols[3]:
                 st.metric("❓ Exam Questions", len(exam_questions))
             with metric_cols[4]:
-                st.metric("📚 Lectures Analyzed", len(lecture_files))
+                st.metric("📚 Lectures Analyzed", lecture_count)
 
             st.markdown("---")
             st.markdown("### 🧠 Topic Intelligence")
@@ -799,7 +853,7 @@ if process_btn:
                     "unless they're emphasized in course guidelines."
                 )
                 
-                gap_df = calculate_gap_analysis(results_df, None, model)
+                gap_df = calculate_gap_analysis(results_df, None, None)
                 
                 if not gap_df.empty:
                     st.write(f"Found **{len(gap_df)} low-coverage topics** to potentially skip")
@@ -870,7 +924,7 @@ if process_btn:
             # ===== TAB 5: DETAILED RESULTS =====
             with tab5:
                 st.markdown("### 📋 Complete Topic Breakdown")
-                st.write(f"Displaying {len(results_df)} topics (Threshold: {confidence_threshold:.2f})")
+                st.write(f"Displaying {len(results_df)} topics (Threshold: {active_threshold:.2f})")
                 
                 col1, col2 = st.columns([2, 1])
                 with col1:
@@ -917,5 +971,3 @@ if process_btn:
                     )
         else:
             st.warning("⚠️ No matching topics found. Try lowering the confidence threshold.")
-    else:
-        st.warning("⚠️ Please upload at least one lecture PDF and an exam PDF to begin analysis.")

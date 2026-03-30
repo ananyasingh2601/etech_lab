@@ -532,9 +532,26 @@ if process_btn:
             # Calculate results with confidence threshold
             results_df = calculate_topic_importance(exam_questions, collection, model, 
                                                     similarity_threshold=confidence_threshold)
+
+            fallback_used = False
+            if results_df.empty and confidence_threshold > 0:
+                retry_df = calculate_topic_importance(
+                    exam_questions,
+                    collection,
+                    model,
+                    similarity_threshold=0.0
+                )
+                if not retry_df.empty:
+                    results_df = retry_df
+                    fallback_used = True
         
         if not results_df.empty:
             st.success("✅ Analysis Complete!")
+            if fallback_used:
+                st.info(
+                    "No topics matched at your selected threshold. Showing best available matches "
+                    "using adaptive fallback so you can continue with topic insights and paper generation."
+                )
             st.markdown("---")
             
             # Display key metrics in columns

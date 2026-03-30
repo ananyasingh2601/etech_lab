@@ -61,10 +61,11 @@ def create_gap_analysis_chart(gap_df):
     if gap_df.empty:
         return None
     
-    fig = px.barh(
+    fig = px.bar(
         gap_df.head(15),
         y="Topic Snippet",
         x="Coverage_Pct",
+        orientation="h",
         title="<b>🚫 Gap Analysis: Low-Coverage Topics (Study Less)</b>",
         color="Coverage_Pct",
         color_continuous_scale="Reds_r",
@@ -207,10 +208,11 @@ def create_file_contribution_bar(df):
         "Relevance Score": "sum"
     }).reset_index().sort_values("Relevance Score", ascending=True)
     
-    fig = px.barh(
+    fig = px.bar(
         file_contrib,
         x="Relevance Score",
         y="File",
+        orientation="h",
         title="<b>📚 Lecture File Contribution to Exam</b>",
         color="Similarity",
         color_continuous_scale="Turbo",

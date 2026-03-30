@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import re
+import io
 
 from extraction import extract_exam_questions
 from processing import process_lecture
@@ -23,6 +24,13 @@ from visualization import (
     create_file_contribution_bar,
     create_topic_card
 )
+
+try:
+    from fpdf import FPDF
+    PDF_EXPORT_AVAILABLE = True
+except ImportError:
+    FPDF = None
+    PDF_EXPORT_AVAILABLE = False
 
 
 STOP_WORDS = {
@@ -96,72 +104,148 @@ def build_topic_intelligence(results_df):
 
 
 def generate_question_paper(results_df, exam_questions, paper_type="mid"):
-    top_topics = [_normalize_topic(t) for t in results_df["Lecture Topic"].head(10).tolist()]
+    ranked = results_df.sort_values(by=["Similarity", "Relevance Score"], ascending=False).reset_index(drop=True)
     question_bank = [q.strip() for q in exam_questions if q and len(q.strip()) > 15]
 
     if paper_type == "mid":
         title = "MID TERM EXAMINATION"
         duration = "1.5 Hours"
         max_marks = 30
-        short_count = 6
-        long_count = 3
+        section_a_count = 6
+        section_a_marks = 2
+        section_b_count = 3
+        section_b_marks = 6
     else:
         title = "END TERM EXAMINATION"
         duration = "3 Hours"
         max_marks = 70
-        short_count = 8
-        long_count = 6
+        section_a_count = 10
+        section_a_marks = 2
+        section_b_count = 5
+        section_b_marks = 10
+
+    def pick_topic(index):
+        if ranked.empty:
+            return "Core Topic", 0.5
+        row = ranked.iloc[index % len(ranked)]
+        return _normalize_topic(row["Lecture Topic"]), float(row["Similarity"])
+
+    def difficulty_label(similarity):
+        if similarity >= 0.75:
+            return "Easy"
+        if similarity >= 0.55:
+            return "Moderate"
+        return "Challenging"
+
+    def pick_seed_question(topic):
+        if not question_bank:
+            return ""
+        keywords = _topic_keywords(topic)
+        for candidate in question_bank:
+            lc = candidate.lower()
+            if any(k in lc for k in keywords):
+                return candidate
+        return ""
+
+    paper_meta = {
+        "title": title,
+        "duration": duration,
+        "max_marks": max_marks,
+        "avg_similarity": round(float(ranked["Similarity"].mean()) if not ranked.empty else 0.0, 3),
+        "high_priority_topics": int((ranked["Similarity"] >= 0.7).sum()) if not ranked.empty else 0,
+        "section_a": [],
+        "section_b": []
+    }
+
+    for i in range(section_a_count):
+        topic, sim = pick_topic(i)
+        kw = _topic_keywords(topic)
+        q_text = f"Explain {kw[0]} in {topic.lower()} with one real-world example."
+        paper_meta["section_a"].append({
+            "number": i + 1,
+            "topic": topic,
+            "difficulty": difficulty_label(sim),
+            "marks": section_a_marks,
+            "text": q_text
+        })
+
+    for i in range(section_b_count):
+        topic, sim = pick_topic(i + section_a_count)
+        seed = pick_seed_question(topic)
+        if seed:
+            q_text = seed
+        else:
+            kw = _topic_keywords(topic)
+            q_text = (
+                f"Analyze {topic.lower()} with focus on {kw[0]} and {kw[-1]}. "
+                "Present architecture, workflow, and practical implications."
+            )
+        paper_meta["section_b"].append({
+            "number": section_a_count + i + 1,
+            "topic": topic,
+            "difficulty": difficulty_label(sim),
+            "marks": section_b_marks,
+            "text": q_text
+        })
 
     lines = [
-        title,
+        paper_meta["title"],
         "Course: Topic Intelligence Based Paper",
-        f"Duration: {duration}",
-        f"Maximum Marks: {max_marks}",
+        f"Duration: {paper_meta['duration']}",
+        f"Maximum Marks: {paper_meta['max_marks']}",
+        "",
+        "Generation Metrics:",
+        f"- Average Similarity: {paper_meta['avg_similarity']}",
+        f"- High Priority Topics: {paper_meta['high_priority_topics']}",
         "",
         "Instructions:",
         "1. Read all questions carefully.",
-        "2. Attempt questions in clear steps with relevant examples.",
-        "3. Draw neat diagrams wherever applicable.",
+        "2. Use diagrams and examples where needed.",
+        "3. Follow marks-based depth in answers.",
         "",
-        "SECTION A - Short Answer Questions"
+        "SECTION A - Short Answer"
     ]
 
-    for i in range(short_count):
-        topic = top_topics[i % max(1, len(top_topics))] if top_topics else "Core Topic"
-        keywords = _topic_keywords(topic)
-        q = f"Q{i + 1}. Explain the role of {keywords[0]} in {topic.lower()}. Give one practical example."
-        lines.append(q)
+    for q in paper_meta["section_a"]:
+        lines.append(f"Q{q['number']}. {q['text']} [{q['marks']} marks]")
 
     lines.append("")
-    lines.append("SECTION B - Long Answer Questions")
+    lines.append("SECTION B - Long Answer")
+    for q in paper_meta["section_b"]:
+        lines.append(f"Q{q['number']}. {q['text']} [{q['marks']} marks]")
 
-    for i in range(long_count):
-        topic = top_topics[(i + short_count) % max(1, len(top_topics))] if top_topics else "Core Topic"
-        keywords = _topic_keywords(topic)
-        matched = ""
+    return "\n".join(lines), paper_meta
 
-        if question_bank:
-            for candidate in question_bank:
-                c_lower = candidate.lower()
-                if any(k in c_lower for k in keywords):
-                    matched = candidate
-                    break
 
-        if matched:
-            q_text = f"Q{short_count + i + 1}. {matched}"
+def generate_paper_pdf_bytes(paper_text, paper_meta):
+    if not PDF_EXPORT_AVAILABLE:
+        return None
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, paper_meta.get("title", "Question Paper"), ln=True)
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, f"Duration: {paper_meta.get('duration', '-')}", ln=True)
+    pdf.cell(0, 8, f"Maximum Marks: {paper_meta.get('max_marks', '-')}", ln=True)
+    pdf.cell(0, 8, f"Average Similarity: {paper_meta.get('avg_similarity', '-')}", ln=True)
+    pdf.ln(2)
+
+    for line in paper_text.splitlines():
+        safe_line = line.encode("latin-1", "ignore").decode("latin-1")
+        if not safe_line.strip():
+            pdf.ln(3)
         else:
-            q_text = (
-                f"Q{short_count + i + 1}. Analyze {topic.lower()} with reference to {keywords[0]} and {keywords[-1]}. "
-                "Provide a structured answer with use-case discussion."
-            )
-        lines.append(q_text)
+            pdf.multi_cell(0, 7, safe_line)
 
-    lines.append("")
-    lines.append("Suggested Focus Topics:")
-    for idx, topic in enumerate(top_topics[:6], start=1):
-        lines.append(f"{idx}. {topic}")
-
-    return "\n".join(lines)
+    raw = pdf.output(dest="S")
+    if isinstance(raw, bytes):
+        return raw
+    if isinstance(raw, bytearray):
+        return bytes(raw)
+    return raw.encode("latin-1", "ignore")
 
 st.set_page_config(
     page_title="Lecture-to-Exam Mapper", 
@@ -203,7 +287,22 @@ st.markdown("""
         color: white;
         border: none;
     }
-    .stTabs [data-baseweb="tab-list"] button { border-radius: 8px 8px 0 0; }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px;
+        background: #eef3fa;
+        border: 1px solid var(--line);
+        padding: 4px 12px;
+        height: 42px;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #e2f4f2 !important;
+        color: #0b5f58 !important;
+        border: 1px solid #b8e4de !important;
+    }
     [data-testid="stWidgetLabel"] p {
         color: var(--ink-main) !important;
         font-weight: 600;
@@ -614,30 +713,53 @@ if process_btn:
 
             if generate_btn:
                 paper_type = "mid" if paper_mode == "Mid Term Paper" else "end"
-                generated_paper = generate_question_paper(results_df, exam_questions, paper_type=paper_type)
+                generated_paper, generated_meta = generate_question_paper(results_df, exam_questions, paper_type=paper_type)
                 st.session_state["generated_paper_text"] = generated_paper
-                st.session_state["generated_paper_name"] = "mid_term_paper.txt" if paper_type == "mid" else "end_term_paper.txt"
+                st.session_state["generated_paper_meta"] = generated_meta
+                st.session_state["generated_paper_name_txt"] = "mid_term_paper.txt" if paper_type == "mid" else "end_term_paper.txt"
+                st.session_state["generated_paper_name_pdf"] = "mid_term_paper.pdf" if paper_type == "mid" else "end_term_paper.pdf"
+                st.session_state["generated_paper_pdf"] = generate_paper_pdf_bytes(generated_paper, generated_meta)
 
             if "generated_paper_text" in st.session_state:
                 st.markdown("#### Generated Paper Preview")
+                meta = st.session_state.get("generated_paper_meta", {})
+                m1, m2, m3 = st.columns(3)
+                with m1:
+                    st.metric("Paper Marks", meta.get("max_marks", "-"))
+                with m2:
+                    st.metric("Avg Similarity Used", meta.get("avg_similarity", "-"))
+                with m3:
+                    st.metric("High Priority Topics Used", meta.get("high_priority_topics", "-"))
                 st.text_area(
                     "Preview",
                     st.session_state["generated_paper_text"],
                     height=360,
                     label_visibility="collapsed"
                 )
-                st.download_button(
-                    label="📥 Download Generated Paper",
-                    data=st.session_state["generated_paper_text"],
-                    file_name=st.session_state.get("generated_paper_name", "question_paper.txt"),
-                    mime="text/plain"
-                )
+                down_col1, down_col2 = st.columns(2)
+                with down_col1:
+                    st.download_button(
+                        label="Download Paper (TXT)",
+                        data=st.session_state["generated_paper_text"],
+                        file_name=st.session_state.get("generated_paper_name_txt", "question_paper.txt"),
+                        mime="text/plain"
+                    )
+                with down_col2:
+                    if st.session_state.get("generated_paper_pdf"):
+                        st.download_button(
+                            label="Download Paper (PDF)",
+                            data=st.session_state["generated_paper_pdf"],
+                            file_name=st.session_state.get("generated_paper_name_pdf", "question_paper.pdf"),
+                            mime="application/pdf"
+                        )
+                    else:
+                        st.warning("PDF export library not installed. Install fpdf2 for PDF downloads.")
             
             st.markdown("---")
             
             # Tab layout for different views
             tab1, tab2, tab3, tab4, tab5 = st.tabs(
-                ["📈 Overview", "⏭️ Gap Analysis", "📊 Distribution", "🌟 Rankings", "📋 Details"]
+                ["Overview", "Gap Analysis", "Distribution", "Rankings", "Details"]
             )
             
             # ===== TAB 1: OVERVIEW =====

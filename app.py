@@ -64,6 +64,23 @@ st.markdown("""
         border: none;
     }
     .stTabs [data-baseweb="tab-list"] button { border-radius: 8px 8px 0 0; }
+    [data-testid="stWidgetLabel"] p {
+        color: var(--ink-main) !important;
+        font-weight: 600;
+    }
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {
+        color: var(--ink-main) !important;
+    }
+    [data-testid="stFileUploaderDropzone"] {
+        background: #1e2333;
+        border: 1px solid #384155;
+    }
+    [data-testid="stFileUploaderDropzone"] * {
+        color: #e4ebf7 !important;
+    }
+    [data-testid="stSlider"] [data-testid="stMarkdownContainer"] p {
+        color: var(--ink-main) !important;
+    }
     .header-title { font-size: 2.5em; color: var(--ink-main); font-weight: 800; text-align: center; margin-bottom: 20px; }
     .info-box {
         background: linear-gradient(130deg, #e6f7f5 0%, #f0f9ff 100%);
@@ -264,47 +281,27 @@ st.markdown("""
 
 st.markdown("""
 <div class="topic-preview-wrap">
-    <div class="doodle doodle-circle"></div>
-    <div class="doodle doodle-wave"></div>
-    <div class="doodle doodle-scribble"></div>
-
-    <div class="topic-preview-tabs">
-        <div class="active">Overview</div>
-        <div class="muted">Topic Breakdown</div>
-        <div class="muted">Trends</div>
-    </div>
-
-    <div class="topic-preview-card">
-        <div class="preview-title">Operating Systems</div>
-
-        <div class="preview-row">
-            <div class="preview-row-head">
-                <div class="preview-topic">Memory Management</div>
-                <div class="preview-pct">32%</div>
-            </div>
-            <div class="preview-track"><div class="preview-fill" style="width: 32%;"></div></div>
-        </div>
-
-        <div class="preview-row">
-            <div class="preview-row-head">
-                <div class="preview-topic">Process Scheduling</div>
-                <div class="preview-pct">21%</div>
-            </div>
-            <div class="preview-track"><div class="preview-fill" style="width: 21%;"></div></div>
-        </div>
-
-        <div class="preview-row">
-            <div class="preview-row-head">
-                <div class="preview-topic">File Systems</div>
-                <div class="preview-pct">18%</div>
-            </div>
-            <div class="preview-track"><div class="preview-fill" style="width: 18%;"></div></div>
-        </div>
-
-        <div class="preview-note">Based on analysis of 87 exam papers (2019-2024)</div>
-    </div>
+    <div class="panel-title">Sample Insights Preview</div>
+    <div class="panel-subtitle">This is an example of what your analyzed results will look like.</div>
 </div>
 """, unsafe_allow_html=True)
+
+preview_col1, preview_col2 = st.columns([1.7, 1])
+with preview_col1:
+    st.markdown("#### Operating Systems - Top Topics")
+    st.write("Memory Management")
+    st.progress(0.32)
+    st.write("Process Scheduling")
+    st.progress(0.21)
+    st.write("File Systems")
+    st.progress(0.18)
+    st.caption("Based on analysis of 87 exam papers (2019-2024)")
+
+with preview_col2:
+    st.markdown("#### Quick Snapshot")
+    st.metric("Likely High-Yield Topics", "12")
+    st.metric("Avg Similarity (Sample)", "0.71")
+    st.metric("Coverage Confidence", "High")
 
 st.markdown("---")
 
